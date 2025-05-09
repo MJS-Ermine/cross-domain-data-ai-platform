@@ -1,12 +1,12 @@
 """
 analyzers/sentiment_analyzer.py
 
-情感分析器，支援 OpenAI API，將分析結果存入資料庫。
+情感分析器，支援 Gemini API，將分析結果存入資料庫。
 """
 from typing import Optional, Dict, Any
 import os
 import logging
-import openai
+import google.generativeai as genai
 from dotenv import load_dotenv
 from database.database import SessionLocal, Article, add_analysis, init_db
 from sqlalchemy.orm import Session
@@ -14,26 +14,19 @@ from sqlalchemy.orm import Session
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+genai.configure(api_key=GEMINI_API_KEY)
 
 SYSTEM_PROMPT = "請判斷下列新聞內容的情感傾向，僅回傳 '正面'、'負面' 或 '中性'。"
 
 
 def analyze_sentiment(text: str) -> Dict[str, Any]:
-    """呼叫 OpenAI API 進行情感分析。"""
+    """呼叫 Gemini API 進行情感分析。"""
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
-            max_tokens=10,
-            temperature=0,
-        )
-        label = response["choices"][0]["message"]["content"].strip()
-        return {"label": label, "raw": response}
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content([SYSTEM_PROMPT, text])
+        label = response.text.strip()
+        return {"label": label, "raw": response.text}
     except Exception as e:
         logging.error(f"[情感分析錯誤] {e}")
         return {"label": "分析失敗", "error": str(e)}
