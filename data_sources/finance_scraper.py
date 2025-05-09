@@ -1,7 +1,7 @@
 """
 data_sources/finance_scraper.py
 
-金融新聞爬蟲模組，支援多來源設定，爬取標題、摘要、網址、發布日期，並存入資料庫。
+金融新聞爬蟲模組，爬取鉅亨網頭條新聞，並存入資料庫。
 """
 from typing import List, Dict, Optional
 import requests
@@ -12,16 +12,15 @@ from database.database import add_article, get_data_source_by_name, init_db, Ses
 
 logging.basicConfig(level=logging.INFO)
 
-# 預設金融新聞來源（可擴充）
 DEFAULT_SOURCES = [
     {
-        "name": "Yahoo Finance TW",
+        "name": "Cnyes Headline",
         "domain_type": "finance",
-        "base_url": "https://tw.stock.yahoo.com/news",
-        "list_selector": "ul.List(n) li",
-        "title_selector": "h3",
-        "summary_selector": "p",
-        "url_selector": "a",
+        "base_url": "https://news.cnyes.com/news/cat/headline?exp=a",
+        "list_selector": "div.list__view-article",
+        "title_selector": "a.list__view-article-title",
+        "summary_selector": "div.list__view-article-summary",
+        "url_selector": "a.list__view-article-title",
         "date_selector": "time",
     },
 ]
@@ -45,7 +44,7 @@ def fetch_articles(source: Dict[str, str]) -> List[Dict[str, str]]:
             summary = summary_tag.get_text(strip=True) if summary_tag else ""
             url = url_tag["href"] if url_tag.has_attr("href") else ""
             if url and not url.startswith("http"):
-                url = "https://tw.stock.yahoo.com" + url
+                url = "https://news.cnyes.com" + url
             pub_date = None
             if date_tag and date_tag.has_attr("datetime"):
                 try:
@@ -67,10 +66,8 @@ def scrape_and_store_all_sources() -> None:
     init_db()
     db = SessionLocal()
     for src in DEFAULT_SOURCES:
-        # 可改為從資料庫讀取來源設定
         ds = get_data_source_by_name(db, src["name"])
         if not ds:
-            # 若資料來源不存在則新增
             from database.database import add_data_source
             ds = add_data_source(db, src["name"], src["domain_type"], src["base_url"])
         articles = fetch_articles(src)
